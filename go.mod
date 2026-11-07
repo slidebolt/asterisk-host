@@ -5,10 +5,10 @@ go 1.26.1
 require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/slidebolt/sb-contract v1.0.6
-	github.com/slidebolt/sb-media-sdk v1.0.0
-	github.com/slidebolt/sb-messenger-sdk v1.0.7
+	github.com/slidebolt/sb-media-sdk v1.0.1
+	github.com/slidebolt/sb-messenger-sdk v1.0.8
 	github.com/slidebolt/sb-runtime v1.0.6
-	github.com/slidebolt/sb-speech-sdk v1.0.0
+	github.com/slidebolt/sb-speech-sdk v1.0.1
 )
 
 require (
