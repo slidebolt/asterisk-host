@@ -26,8 +26,8 @@ github.com/slidebolt/sb-messenger-sdk v1.0.8 h1:M5uM3l8f9lDs/5HcAlOgO+Jovs8qVM9f
 github.com/slidebolt/sb-messenger-sdk v1.0.8/go.mod h1:yJxHiUgqcO/TUj9yiPkVyTwrN0/3BBy6HD17TdWPCEA=
 github.com/slidebolt/sb-runtime v1.0.6 h1:Kxdgvx4FGiC7NvE+S/QtVituyqBh+Typmop8TzVNKo4=
 github.com/slidebolt/sb-runtime v1.0.6/go.mod h1:094+7ODH66/fYjC8PSmuw1skJpML2hwrb/vXl3Zs9uw=
-github.com/slidebolt/sb-speech-sdk v1.0.1 h1:cKRbP50YsH7shoAQJgxiu9GXgzZlwuYrGzU1QYEA/D8=
-github.com/slidebolt/sb-speech-sdk v1.0.1/go.mod h1:lx7F2eRxhnQrPRzL9dGkwo0VyZIOVcbTEDGDUcPJtV8=
+github.com/slidebolt/sb-speech-sdk v1.0.2 h1:BcnMQUZLCh2lbNQFXze25S2ng4jaZpVt6q65mzAIw68=
+github.com/slidebolt/sb-speech-sdk v1.0.2/go.mod h1:lx7F2eRxhnQrPRzL9dGkwo0VyZIOVcbTEDGDUcPJtV8=
 golang.org/x/crypto v0.48.0 h1:/VRzVqiRSggnhY7gNRxPauEQ5Drw9haKdM0jqfcCFts=
 golang.org/x/crypto v0.48.0/go.mod h1:r0kV5h3qnFPlQnBSrULhlsRfryS2pmewsg+XfMgkVos=
 golang.org/x/sys v0.21.0/go.mod h1:/VUhepiaJMQUp4+oa/7Zr1D23ma6VTLIYjOOTFZPUcA=
