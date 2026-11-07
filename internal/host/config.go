@@ -19,6 +19,14 @@ type EndpointConfig struct {
 	Dial string `json:"dial,omitempty"`
 }
 
+// ServiceConfig is a number that SlideBolt answers itself, such as a line to an
+// agent. The Asterisk dialplan sends calls to it with Stasis(slidebolt,service,<number>).
+type ServiceConfig struct {
+	Name string `json:"name,omitempty"`
+	// Call is the call each answered caller joins, such as "agent".
+	Call string `json:"call"`
+}
+
 // Config configures a Host.
 type Config struct {
 	Bind      string
@@ -28,6 +36,8 @@ type Config struct {
 	ARIPass   string
 	Endpoints map[string]EndpointConfig
 	Trunks    map[string]bool
+	// Services are numbers answered by SlideBolt. Only these are accepted.
+	Services map[string]ServiceConfig
 	// DialAllow lists outside numbers that may be dialed. Empty means none.
 	DialAllow       map[string]bool
 	MaxCall         time.Duration
@@ -64,6 +74,7 @@ func LoadConfig() (Config, error) {
 		ARIUser:         os.Getenv("ASTERISK_ARI_USER"),
 		ARIPass:         os.Getenv("ASTERISK_ARI_PASS"),
 		Endpoints:       map[string]EndpointConfig{},
+		Services:        map[string]ServiceConfig{},
 		Trunks:          listSet(os.Getenv("ASTERISK_HOST_TRUNKS")),
 		DialAllow:       listSet(os.Getenv("ASTERISK_HOST_DIAL_ALLOW")),
 		MaxCall:         envSeconds("ASTERISK_HOST_MAX_CALL_SECONDS", 900),
@@ -83,6 +94,19 @@ func LoadConfig() (Config, error) {
 			case "", PolicyNever, PolicyInCall, PolicyOnCommand:
 			default:
 				return c, fmt.Errorf("ASTERISK_HOST_ENDPOINTS: %s: unknown listen policy %q", id, e.Listen)
+			}
+		}
+	}
+	if raw := os.Getenv("ASTERISK_HOST_SERVICES"); raw != "" {
+		if err := json.Unmarshal([]byte(raw), &c.Services); err != nil {
+			return c, fmt.Errorf("ASTERISK_HOST_SERVICES: %w", err)
+		}
+		for number, svc := range c.Services {
+			if !serviceNumberPattern.MatchString(number) {
+				return c, fmt.Errorf("ASTERISK_HOST_SERVICES: %q is not a number", number)
+			}
+			if !callIDPattern.MatchString(svc.Call) {
+				return c, fmt.Errorf("ASTERISK_HOST_SERVICES: %s: call must match %s", number, callIDPattern)
 			}
 		}
 	}

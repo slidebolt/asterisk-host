@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/slidebolt/asterisk-host/internal/ari"
 	messenger "github.com/slidebolt/sb-messenger-sdk"
@@ -99,6 +100,10 @@ func (h *Host) onSpeechEvent(c *activeCall, at *activeTranscription, ev speech.E
 		t.Error = ""
 	case speech.EventError:
 		t.Error = ev.Error
+	case speech.EventSpeaking, speech.EventSpoken:
+		if !h.applySpeech(c, ev) {
+			return
+		}
 	default:
 		return
 	}
@@ -170,4 +175,61 @@ func (h *Host) releaseTranscription(ctx context.Context, c *activeCall, status, 
 	}
 	c.state.Transcript.Status = status
 	c.state.Transcript.Error = errMsg
+	if sp := c.state.Speech; sp != nil && sp.Status == SpeechSpeaking {
+		sp.Status = SpeechIdle
+	}
+}
+
+// Say speaks text into a call through its transcription session, whose media
+// channel is already in the call's bridge. Saying something new interrupts
+// anything still being spoken.
+func (h *Host) Say(callID, text string) (CallSpeech, error) {
+	text = strings.TrimSpace(text)
+	if text == "" || len(text) > speech.MaxSayLength {
+		return CallSpeech{}, fmt.Errorf("%w: text must be 1 to %d characters", ErrInvalid, speech.MaxSayLength)
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	c, ok := h.calls[callID]
+	if !ok || c.state.Status != CallActive {
+		return CallSpeech{}, ErrNotFound
+	}
+	if c.transcr == nil || c.transcr.sessionID == "" {
+		return CallSpeech{}, fmt.Errorf("%w: start transcription first; speech uses its audio path", ErrConflict)
+	}
+	if c.state.Speech == nil {
+		c.state.Speech = &CallSpeech{Status: SpeechIdle}
+	}
+	sp := c.state.Speech
+	seq, err := h.speech.Say(c.transcr.sessionID, text)
+	if err != nil {
+		sp.Status, sp.Error = SpeechError, err.Error()
+		h.emitCall(c)
+		return *sp, fmt.Errorf("say: %w", err)
+	}
+	sp.Status, sp.Seq, sp.Text, sp.Error = SpeechSpeaking, seq, text, ""
+	h.emitCall(c)
+	return *sp, nil
+}
+
+// applySpeech records speaking and spoken events, ignoring ones about an
+// utterance that has since been replaced. Callers hold mu.
+func (h *Host) applySpeech(c *activeCall, ev speech.Event) bool {
+	if c.state.Speech == nil {
+		c.state.Speech = &CallSpeech{Status: SpeechIdle}
+	}
+	sp := c.state.Speech
+	if ev.Seq < sp.Seq {
+		return false
+	}
+	sp.Seq, sp.Text = ev.Seq, ev.Text
+	switch {
+	case ev.Type == speech.EventSpeaking:
+		sp.Status, sp.Error = SpeechSpeaking, ""
+	case ev.Error != "" && ev.Error != "interrupted":
+		sp.Status, sp.Error = SpeechError, ev.Error
+	default:
+		sp.Status, sp.Error = SpeechIdle, ""
+	}
+	return true
 }

@@ -23,8 +23,16 @@ func (h *Host) refreshEndpoints() {
 	}
 	seen := map[string]bool{}
 	for _, ep := range found {
+		if _, isService := h.cfg.Services[ep.Resource]; isService {
+			log.Printf("asterisk-host: %s is both a PJSIP endpoint and a service; treating it as a service", ep.Resource)
+			continue
+		}
 		seen[ep.Resource] = true
 		h.applyEndpoint(ctx, ep)
+	}
+	for id, svc := range h.cfg.Services {
+		seen[id] = true
+		h.applyService(id, svc)
 	}
 	for id := range h.endpoints {
 		if !seen[id] {
@@ -51,6 +59,24 @@ func (h *Host) applyEndpoint(ctx context.Context, ep ari.Endpoint) {
 		return
 	}
 	e.Status = status
+	h.emitEndpoint(e)
+}
+
+// applyService lists a service number as an endpoint. It is online whenever
+// Asterisk is connected, since SlideBolt itself answers it.
+func (h *Host) applyService(id string, svc ServiceConfig) {
+	e, ok := h.endpoints[id]
+	if !ok {
+		name := svc.Name
+		if name == "" {
+			name = id
+		}
+		e = &Endpoint{ID: id, Name: name, Kind: "service", Role: "service", Features: Features{Listen: PolicyNever}}
+		h.endpoints[id] = e
+	} else if e.Status == "online" {
+		return
+	}
+	e.Status = "online"
 	h.emitEndpoint(e)
 }
 

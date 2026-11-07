@@ -53,7 +53,7 @@ type Features struct {
 type Endpoint struct {
 	ID       string   `json:"id"`
 	Name     string   `json:"name"`
-	Kind     string   `json:"kind"` // extension, trunk
+	Kind     string   `json:"kind"` // extension, trunk, service
 	Role     string   `json:"role,omitempty"`
 	Status   string   `json:"status"` // online, offline
 	Call     string   `json:"call,omitempty"`
@@ -85,6 +85,26 @@ const (
 	TranscriptError     = "error"
 )
 
+// CallSpeech is text being spoken into a call. Seq rises with every utterance.
+type CallSpeech struct {
+	Status string `json:"status"` // idle, speaking, error
+	Seq    int    `json:"seq"`
+	Text   string `json:"text,omitempty"`
+	Error  string `json:"error,omitempty"`
+}
+
+// Speech statuses.
+const (
+	SpeechIdle     = "idle"
+	SpeechSpeaking = "speaking"
+	SpeechError    = "error"
+)
+
+// SayRequest speaks text into a call.
+type SayRequest struct {
+	Text string `json:"text"`
+}
+
 // Participant is one party in a call.
 type Participant struct {
 	ID       string `json:"id"`
@@ -106,6 +126,7 @@ type Call struct {
 	Participants []Participant `json:"participants"`
 	Stream       *Stream       `json:"stream,omitempty"`
 	Transcript   *Transcript   `json:"transcript,omitempty"`
+	Speech       *CallSpeech   `json:"speech,omitempty"`
 }
 
 // Snapshot is the complete state, and the sequence to follow events from.

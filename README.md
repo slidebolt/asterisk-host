@@ -13,6 +13,11 @@ Models Asterisk as endpoints and calls, behind a REST API and event stream. See
 - **Stream:** a way to listen to a call. Stopping one never ends a real conversation.
 - **Transcription:** speech-to-text on a call, from `sb-speech`. Each utterance updates
   the call's transcript. It is optional, and follows the same listen policy as a stream.
+- **Speech:** text spoken into a call by `sb-speech`, over the transcription's audio path,
+  so it needs an active transcription. The call's `speech` shows `speaking`, then `idle`.
+- **Service:** a number SlideBolt answers itself, such as a line to an agent. A caller
+  joins that service's call, and whoever handles the call decides what happens. The
+  dialplan sends calls to it with `Stasis(slidebolt,service,<number>)`.
 
 ## Configuration
 
@@ -23,6 +28,7 @@ Models Asterisk as endpoints and calls, behind a REST API and event stream. See
 | `ASTERISK_HOST_BIND` | Listen address, default `127.0.0.1:47832` |
 | `ASTERISK_HOST_ENDPOINTS` | JSON of what Asterisk cannot report: `name`, `role`, `autoAnswer`, `listen`, `dial` |
 | `ASTERISK_HOST_TRUNKS` | Comma-separated endpoints that are trunks |
+| `ASTERISK_HOST_SERVICES` | JSON of numbers SlideBolt answers, e.g. `{"4000":{"name":"Agent","call":"agent"}}` |
 | `ASTERISK_HOST_DIAL_ALLOW` | Comma-separated outside numbers that may be dialed. Empty means none |
 | `ASTERISK_HOST_MAX_CALL_SECONDS` | Call limit, default 900 |
 | `ASTERISK_HOST_MAX_LISTEN_SECONDS` | Limit on a private listening call, default 300 |
@@ -36,6 +42,7 @@ stream URL never places a call.
 The host enforces these whoever calls it. Scripts cannot override them.
 
 - Only known extensions and allowlisted numbers can be dialed, and raw dial strings are refused.
+- Only configured service numbers are answered. A second caller to a busy service gets a busy signal.
 - A stream of a call needs every party's listen policy to allow it.
 - Calls end at the time limit. Asterisk also enforces it a few seconds later, in case the host has died.
 - A call that exists only for listening ends when its stream ends.

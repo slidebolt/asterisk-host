@@ -308,6 +308,8 @@ type fakeSpeech struct {
 	stops    []string
 	handler  func(speech.Event)
 	startErr error
+	said     []string
+	sayErr   error
 }
 
 func (s *fakeSpeech) Start(speech.StartRequest) (speech.StartReply, error) {
@@ -325,6 +327,16 @@ func (s *fakeSpeech) Stop(id string) error {
 	defer s.mu.Unlock()
 	s.stops = append(s.stops, id)
 	return nil
+}
+
+func (s *fakeSpeech) Say(id, text string) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.sayErr != nil {
+		return 0, s.sayErr
+	}
+	s.said = append(s.said, id+": "+text)
+	return len(s.said), nil
 }
 
 func (s *fakeSpeech) OnEvent(_ string, fn func(speech.Event)) (messenger.Subscription, error) {

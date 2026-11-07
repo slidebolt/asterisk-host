@@ -31,6 +31,7 @@ const openAPI = `{
     "/v1/calls/{id}/playbacks": {"post": {"operationId": "play"}},
     "/v1/calls/{id}/recordings": {"post": {"operationId": "record", "description": "Not implemented yet, returns 501."}},
     "/v1/calls/{id}/transcription": {"post": {"operationId": "startTranscription"}, "delete": {"operationId": "stopTranscription"}},
+    "/v1/calls/{id}/speech": {"post": {"operationId": "say", "description": "Speaks text into the call. Needs an active transcription, whose audio path it uses."}},
     "/v1/calls/{id}/streams": {"post": {"operationId": "startCallStream"}, "delete": {"operationId": "stopCallStream"}},
     "/v1/commands/{id}": {"get": {"operationId": "getCommand"}}
   }
@@ -215,6 +216,18 @@ func (h *Host) Handler() http.Handler {
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
+	})
+	mux.HandleFunc("POST /v1/calls/{id}/speech", func(w http.ResponseWriter, r *http.Request) {
+		var req SayRequest
+		if !readJSON(w, r, &req) {
+			return
+		}
+		sp, err := h.Say(r.PathValue("id"), req.Text)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusAccepted, sp)
 	})
 	mux.HandleFunc("GET /v1/commands/{id}", func(w http.ResponseWriter, r *http.Request) {
 		cmd, err := h.GetCommand(r.PathValue("id"))

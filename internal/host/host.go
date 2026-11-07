@@ -52,6 +52,8 @@ var (
 	soundPattern    = regexp.MustCompile(`^[A-Za-z0-9_/-]{1,128}$`)
 	dtmfPattern     = regexp.MustCompile(`^[0-9A-D*#]{1,32}$`)
 	callerIDPattern = regexp.MustCompile(`^"?([^"<]*?)"?\s*<`)
+	// serviceNumberPattern is a number SlideBolt can answer.
+	serviceNumberPattern = regexp.MustCompile(`^[0-9]{2,10}$`)
 )
 
 // Media is the part of sb-media the host uses.
@@ -95,6 +97,7 @@ type activeCall struct {
 type Speech interface {
 	Start(speech.StartRequest) (speech.StartReply, error)
 	Stop(sessionID string) error
+	Say(sessionID, text string) (int, error)
 	OnEvent(sessionID string, handler func(speech.Event)) (messenger.Subscription, error)
 }
 
@@ -242,6 +245,10 @@ func cloneCall(c *Call) Call {
 		t := *c.Transcript
 		out.Transcript = &t
 	}
+	if c.Speech != nil {
+		sp := *c.Speech
+		out.Speech = &sp
+	}
 	return out
 }
 
@@ -310,6 +317,12 @@ func (h *Host) onDisconnected() {
 	defer h.mu.Unlock()
 	h.server.Connected = false
 	h.server.Error = "lost connection to asterisk"
+	for id := range h.cfg.Services {
+		if e, ok := h.endpoints[id]; ok && e.Status != "offline" {
+			e.Status = "offline"
+			h.emitEndpoint(e)
+		}
+	}
 	for _, c := range h.activeCalls() {
 		h.endCall(c, "lost connection to asterisk")
 	}
@@ -377,6 +390,9 @@ func (h *Host) onEvent(ev ari.Event) {
 
 	c, ok := h.channels[ev.Channel.ID]
 	if !ok {
+		if ev.Type == "StasisStart" && len(ev.Args) >= 2 && ev.Args[0] == "service" {
+			h.onServiceCall(ev)
+		}
 		return
 	}
 	if t := c.transcr; t != nil && t.channel == ev.Channel.ID {

@@ -50,8 +50,12 @@ func New(baseURL, user, pass string) *Client {
 
 // Channel is the part of an ARI channel this package uses.
 type Channel struct {
-	ID    string `json:"id"`
-	State string `json:"state"`
+	ID     string `json:"id"`
+	State  string `json:"state"`
+	Caller struct {
+		Name   string `json:"name"`
+		Number string `json:"number"`
+	} `json:"caller"`
 }
 
 // Endpoint is an ARI endpoint.
@@ -86,6 +90,7 @@ type Event struct {
 	Endpoint Endpoint `json:"endpoint"`
 	Playback Playback `json:"playback"`
 	Digit    string   `json:"digit"`
+	Args     []string `json:"args"`
 	Cause    int      `json:"cause"`
 	CauseTxt string   `json:"cause_txt"`
 }
@@ -269,6 +274,21 @@ func (c *Client) ReloadModule(ctx context.Context, module string) error {
 // Hangup ends a channel. A missing channel is not an error.
 func (c *Client) Hangup(ctx context.Context, id string) error {
 	return ignoreNotFound(c.do(ctx, http.MethodDelete, "/channels/"+url.PathEscape(id), nil, nil))
+}
+
+// HangupBusy ends a channel with a busy signal.
+func (c *Client) HangupBusy(ctx context.Context, id string) error {
+	return ignoreNotFound(c.do(ctx, http.MethodDelete, "/channels/"+url.PathEscape(id), url.Values{"reason": {"busy"}}, nil))
+}
+
+// Answer answers an incoming channel.
+func (c *Client) Answer(ctx context.Context, id string) error {
+	return c.do(ctx, http.MethodPost, "/channels/"+url.PathEscape(id)+"/answer", nil, nil)
+}
+
+// SetVariable sets a channel variable, such as TIMEOUT(absolute).
+func (c *Client) SetVariable(ctx context.Context, id, name, value string) error {
+	return c.do(ctx, http.MethodPost, "/channels/"+url.PathEscape(id)+"/variable", url.Values{"variable": {name}, "value": {value}}, nil)
 }
 
 // Channels lists all channels.
