@@ -59,6 +59,22 @@ type Endpoint struct {
 	Call     string   `json:"call,omitempty"`
 	Features Features `json:"features"`
 	Stream   *Stream  `json:"stream,omitempty"`
+	// Inbox is set on service numbers that accept text messages.
+	Inbox *Inbox `json:"inbox,omitempty"`
+}
+
+// Inbox is the latest text message to a service number. Seq rises with every one.
+type Inbox struct {
+	Seq  int    `json:"seq"`
+	From string `json:"from,omitempty"`
+	Text string `json:"text,omitempty"`
+	At   string `json:"at,omitempty"`
+}
+
+// MessageRequest sends a text message from a service number to an extension.
+type MessageRequest struct {
+	To   string `json:"to"`
+	Text string `json:"text"`
 }
 
 // Stream is a way to listen to a call.

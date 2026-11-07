@@ -25,6 +25,8 @@ type ServiceConfig struct {
 	Name string `json:"name,omitempty"`
 	// Call is the call each answered caller joins, such as "agent".
 	Call string `json:"call"`
+	// Text accepts text messages from extensions, and lets SlideBolt reply.
+	Text bool `json:"text,omitempty"`
 }
 
 // Config configures a Host.

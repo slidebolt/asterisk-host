@@ -83,11 +83,19 @@ type Bridge struct {
 	ID string `json:"id"`
 }
 
+// Message is an out-of-call text message.
+type Message struct {
+	From string `json:"from"`
+	To   string `json:"to"`
+	Body string `json:"body"`
+}
+
 // Event is an ARI event.
 type Event struct {
 	Type     string   `json:"type"`
 	Channel  Channel  `json:"channel"`
-	Endpoint Endpoint `json:"endpoint"`
+	Endpoint Endpoint `json:"endpoint"` // for TextMessageReceived, the sender
+	Message  Message  `json:"message"`
 	Playback Playback `json:"playback"`
 	Digit    string   `json:"digit"`
 	Args     []string `json:"args"`
@@ -264,6 +272,12 @@ func (c *Client) SubscribeEndpoints(ctx context.Context, app string) error {
 func (c *Client) UnsubscribeEndpoints(ctx context.Context, app string) error {
 	path := "/applications/" + url.PathEscape(app) + "/subscription"
 	return ignoreNotFound(c.do(ctx, http.MethodDelete, path, url.Values{"eventSource": {"endpoint:PJSIP"}}, nil))
+}
+
+// SendMessage sends an out-of-call text message. to is a destination such as
+// pjsip:201, and from is what the recipient sees as the sender.
+func (c *Client) SendMessage(ctx context.Context, to, from, body string) error {
+	return c.do(ctx, http.MethodPut, "/endpoints/sendMessage", url.Values{"to": {to}, "from": {from}, "body": {body}}, nil)
 }
 
 // ReloadModule reloads one Asterisk module.

@@ -119,6 +119,7 @@ type Host struct {
 	channels  map[string]*activeCall
 	commands  map[string]*Command
 	cmdOrder  []string
+	msgTimes  map[string][]time.Time // recent texts per sender, for the rate limit
 	cancel    context.CancelFunc
 	closed    bool
 }
@@ -135,6 +136,7 @@ func New(cfg Config, m Media, sp Speech) *Host {
 		calls:     map[string]*activeCall{},
 		channels:  map[string]*activeCall{},
 		commands:  map[string]*Command{},
+		msgTimes:  map[string][]time.Time{},
 	}
 }
 
@@ -258,6 +260,10 @@ func cloneEndpoint(e *Endpoint) Endpoint {
 		s := *e.Stream
 		out.Stream = &s
 	}
+	if e.Inbox != nil {
+		in := *e.Inbox
+		out.Inbox = &in
+	}
 	return out
 }
 
@@ -377,6 +383,9 @@ func (h *Host) onEvent(ev ari.Event) {
 		ctx, cancel := ariContext()
 		defer cancel()
 		h.applyEndpoint(ctx, ev.Endpoint)
+		return
+	case "TextMessageReceived":
+		h.onTextMessage(ev)
 		return
 	case "PlaybackFinished":
 		for _, c := range h.activeCalls() {

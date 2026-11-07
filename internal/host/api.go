@@ -22,6 +22,7 @@ const openAPI = `{
     "/v1/endpoints/{id}": {"get": {"operationId": "getEndpoint"}},
     "/v1/endpoints/{id}/listen": {"post": {"operationId": "startListen"}, "delete": {"operationId": "stopListen"}},
     "/v1/endpoints/{id}/hangup": {"post": {"operationId": "hangupEndpoint"}},
+    "/v1/endpoints/{id}/messages": {"post": {"operationId": "sendMessage", "description": "Sends a text message from a service number with text on to an extension. Never to a trunk or an outside number."}},
     "/v1/trunks": {"get": {"operationId": "listTrunks"}},
     "/v1/calls": {"get": {"operationId": "listCalls"}},
     "/v1/calls/{id}": {"put": {"operationId": "ensureCall"}, "get": {"operationId": "getCall"}, "delete": {"operationId": "endCall"}},
@@ -94,6 +95,20 @@ func (h *Host) Handler() http.Handler {
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
+	})
+
+	mux.HandleFunc("POST /v1/endpoints/{id}/messages", func(w http.ResponseWriter, r *http.Request) {
+		var req MessageRequest
+		if !readJSON(w, r, &req) {
+			return
+		}
+		cmd, err := h.SendMessage(r.PathValue("id"), req)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		w.Header().Set("Location", "/v1/commands/"+escapePath(cmd.ID))
+		writeJSON(w, http.StatusAccepted, cmd)
 	})
 
 	mux.HandleFunc("GET /v1/calls", func(w http.ResponseWriter, _ *http.Request) {

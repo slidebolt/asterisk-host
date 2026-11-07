@@ -72,6 +72,9 @@ func (h *Host) applyService(id string, svc ServiceConfig) {
 			name = id
 		}
 		e = &Endpoint{ID: id, Name: name, Kind: "service", Role: "service", Features: Features{Listen: PolicyNever}}
+		if svc.Text {
+			e.Inbox = &Inbox{}
+		}
 		h.endpoints[id] = e
 	} else if e.Status == "online" {
 		return
