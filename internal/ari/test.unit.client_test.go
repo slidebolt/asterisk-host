@@ -28,7 +28,7 @@ func TestRequests_ShapeAndAuth(t *testing.T) {
 	ctx := context.Background()
 	calls := []error{
 		c.CreateBridge(ctx, "b"),
-		c.ExternalMedia(ctx, "m", "app", "172.27.0.1", 41000),
+		c.ExternalMedia(ctx, "m", "app", "172.27.0.1", 41000, FormatG722),
 		c.Originate(ctx, "c", "PJSIP/3000", "app", 30, 900),
 		c.AddChannel(ctx, "b", "c"),
 		c.Hangup(ctx, "c"),
@@ -41,7 +41,7 @@ func TestRequests_ShapeAndAuth(t *testing.T) {
 	}
 	want := []string{
 		"POST /ari/bridges?bridgeId=b&type=mixing",
-		"POST /ari/channels/externalMedia?app=app&channelId=m&external_host=172.27.0.1%3A41000&format=ulaw",
+		"POST /ari/channels/externalMedia?app=app&channelId=m&external_host=172.27.0.1%3A41000&format=g722",
 		"POST /ari/channels?app=app&channelId=c&endpoint=PJSIP%2F3000&timeout=30",
 		"POST /ari/bridges/b/addChannel?channel=c",
 		"DELETE /ari/channels/c?",

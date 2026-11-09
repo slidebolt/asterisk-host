@@ -167,13 +167,24 @@ func (c *Client) AddChannel(ctx context.Context, bridgeID, channelID string) err
 	return c.do(ctx, http.MethodPost, path, url.Values{"channel": {channelID}}, nil)
 }
 
-// ExternalMedia creates a channel that sends ulaw RTP to host:port.
-func (c *Client) ExternalMedia(ctx context.Context, channelID, app, host string, port int) error {
+// External media formats.
+const (
+	FormatULaw = "ulaw" // 8 kHz mu-law, telephone quality
+	// FormatG722 is 16 kHz wideband (HD voice). Its static payload type (9)
+	// works both ways; a linear format such as slin16 needs a dynamic payload
+	// type, which this Asterisk's externalMedia cannot set for what it receives.
+	FormatG722 = "g722"
+)
+
+// ExternalMedia creates a channel that exchanges RTP in format with host:port.
+// Asterisk converts between it and the codecs of the other channels in the
+// bridge.
+func (c *Client) ExternalMedia(ctx context.Context, channelID, app, host string, port int, format string) error {
 	return c.do(ctx, http.MethodPost, "/channels/externalMedia", url.Values{
 		"channelId":     {channelID},
 		"app":           {app},
 		"external_host": {host + ":" + strconv.Itoa(port)},
-		"format":        {"ulaw"},
+		"format":        {format},
 	}, nil)
 }
 

@@ -7,6 +7,7 @@ import (
 	"log"
 	"strings"
 
+	"github.com/slidebolt/asterisk-host/internal/ari"
 	media "github.com/slidebolt/sb-media-sdk"
 )
 
@@ -179,7 +180,7 @@ func (h *Host) attachStream(c *activeCall, s *activeStream) error {
 	c.state.Stream = s.state
 	ctx, cancel := ariContext()
 	defer cancel()
-	if err := h.ari.ExternalMedia(ctx, s.channel, stasisApp, reply.RTPHost, reply.RTPPort); err != nil {
+	if err := h.ari.ExternalMedia(ctx, s.channel, stasisApp, reply.RTPHost, reply.RTPPort, ari.FormatULaw); err != nil {
 		h.releaseStream(ctx, c, StreamError, err.Error())
 		h.emitCall(c)
 		return err

@@ -11,6 +11,12 @@ import (
 	speech "github.com/slidebolt/sb-speech-sdk"
 )
 
+// transcriptionInput is the audio sb-speech gets from a call: wideband G.722,
+// so speech recognition and spoken replies are not limited to telephone
+// quality. A G.722 caller passes straight through; Asterisk converts any other
+// codec, so a narrowband caller sounds as it did before.
+var transcriptionInput = speech.Input{Type: speech.InputRTP, Codec: speech.CodecG722, SampleRate: 16000}
+
 // activeTranscription is a speech-to-text session attached to a call's bridge. It
 // uses the same external media path as a stream, and it never affects the call.
 type activeTranscription struct {
@@ -40,9 +46,7 @@ func (h *Host) StartTranscription(callID string) (Transcript, error) {
 	t.Status = TranscriptStarting
 	t.Error = ""
 
-	reply, err := h.speech.Start(speech.StartRequest{
-		Input: speech.Input{Type: speech.InputRTP, Codec: speech.CodecPCMU, SampleRate: 8000},
-	})
+	reply, err := h.speech.Start(speech.StartRequest{Input: transcriptionInput})
 	if err != nil {
 		t.Status = TranscriptError
 		t.Error = err.Error()
@@ -59,7 +63,7 @@ func (h *Host) StartTranscription(callID string) (Transcript, error) {
 
 	ctx, cancel := ariContext()
 	defer cancel()
-	if err := h.ari.ExternalMedia(ctx, at.channel, stasisApp, reply.RTPHost, reply.RTPPort); err != nil {
+	if err := h.ari.ExternalMedia(ctx, at.channel, stasisApp, reply.RTPHost, reply.RTPPort, ari.FormatG722); err != nil {
 		h.releaseTranscription(ctx, c, TranscriptError, err.Error())
 		h.emitCall(c)
 		return *t, err

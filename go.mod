@@ -8,7 +8,7 @@ require (
 	github.com/slidebolt/sb-media-sdk v1.0.1
 	github.com/slidebolt/sb-messenger-sdk v1.0.8
 	github.com/slidebolt/sb-runtime v1.0.6
-	github.com/slidebolt/sb-speech-sdk v1.0.2
+	github.com/slidebolt/sb-speech-sdk v1.0.3
 )
 
 require (

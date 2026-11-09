@@ -308,13 +308,15 @@ type fakeSpeech struct {
 	stops    []string
 	handler  func(speech.Event)
 	startErr error
+	inputs   []speech.Input
 	said     []string
 	sayErr   error
 }
 
-func (s *fakeSpeech) Start(speech.StartRequest) (speech.StartReply, error) {
+func (s *fakeSpeech) Start(req speech.StartRequest) (speech.StartReply, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.inputs = append(s.inputs, req.Input)
 	if s.startErr != nil {
 		return speech.StartReply{}, s.startErr
 	}
@@ -1053,6 +1055,16 @@ func TestTranscription_TextReachesTheCall(t *testing.T) {
 	}
 	if !strings.Contains(h.ari.lastQuery("POST /channels/externalMedia"), "external_host=10.0.0.2%3A41100") {
 		t.Fatalf("audio is not going to sb-speech: %s", h.ari.lastQuery("POST /channels/externalMedia"))
+	}
+	// Wideband both ways: Asterisk sends G.722, and sb-speech expects it.
+	if q := h.ari.lastQuery("POST /channels/externalMedia"); !strings.Contains(q, "format=g722") {
+		t.Fatalf("speech audio is not wideband: %s", q)
+	}
+	h.speech.mu.Lock()
+	in := h.speech.inputs
+	h.speech.mu.Unlock()
+	if len(in) != 1 || in[0].Codec != speech.CodecG722 || in[0].SampleRate != 16000 {
+		t.Fatalf("speech session input = %+v, want G.722 at 16000", in)
 	}
 	h.ari.channelEvent(t, "StasisStart", h.ari.speechChannel())
 	h.eventually("listening", func() bool { return h.transcript("voice").Status == TranscriptListening })
