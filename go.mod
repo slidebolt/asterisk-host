@@ -4,10 +4,10 @@ go 1.26.1
 
 require (
 	github.com/gorilla/websocket v1.5.3
-	github.com/slidebolt/sb-contract v1.0.6
-	github.com/slidebolt/sb-media-sdk v1.0.1
-	github.com/slidebolt/sb-messenger-sdk v1.0.8
-	github.com/slidebolt/sb-runtime v1.0.6
+	github.com/slidebolt/sb-contract v1.0.9
+	github.com/slidebolt/sb-media-sdk v1.0.4
+	github.com/slidebolt/sb-messenger-sdk v1.0.9
+	github.com/slidebolt/sb-runtime v1.0.7
 	github.com/slidebolt/sb-speech-sdk v1.0.3
 )
 
@@ -21,6 +21,7 @@ require (
 	github.com/nats-io/nats.go v1.49.0 // indirect
 	github.com/nats-io/nkeys v0.4.15 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
+	github.com/slidebolt/sb-domain v1.0.24 // indirect
 	golang.org/x/crypto v0.48.0 // indirect
 	golang.org/x/sys v0.42.0 // indirect
 	golang.org/x/time v0.15.0 // indirect

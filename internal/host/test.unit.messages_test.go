@@ -42,7 +42,10 @@ func (h *harness) settle(from string) {
 	h.t.Helper()
 	before := h.inbox("4000").Seq
 	h.text(from, "4000", "marker")
-	h.eventually("marker", func() bool { return h.inbox("4000").Seq == before+1 })
+	h.eventually("marker", func() bool {
+		inbox := h.inbox("4000")
+		return inbox.Seq > before && inbox.Text == "marker"
+	})
 }
 
 func TestText_ServiceWithTextHasAnInbox(t *testing.T) {

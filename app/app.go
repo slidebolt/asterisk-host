@@ -39,6 +39,13 @@ func (a *App) Hello() contract.HelloResponse {
 		Kind:            contract.KindService,
 		ContractVersion: contract.ContractVersion,
 		DependsOn:       []string{"messenger", "media"},
+		Setup: contract.RequiredSetup("Voice",
+			contract.SetupField{Key: "bind", Environment: "ASTERISK_HOST_BIND", Name: "Host bind address", Control: contract.SetupText, Advanced: true},
+			contract.SetupField{Key: "token", Environment: "ASTERISK_HOST_TOKEN", Name: "Host token", Control: contract.SetupSecret, Sensitive: true, Advanced: true},
+			contract.SetupField{Key: "ariURL", Environment: "ASTERISK_ARI_URL", Name: "Asterisk ARI URL", Control: contract.SetupText, Format: "url", Advanced: true},
+			contract.SetupField{Key: "ariUser", Environment: "ASTERISK_ARI_USER", Name: "Asterisk ARI user", Control: contract.SetupText, Advanced: true},
+			contract.SetupField{Key: "ariPassword", Environment: "ASTERISK_ARI_PASS", Name: "Asterisk ARI password", Control: contract.SetupSecret, Sensitive: true, Advanced: true},
+		),
 	}
 }
 
