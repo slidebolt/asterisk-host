@@ -128,8 +128,8 @@ func TestText_ReplyGoesToTheExtensionFromTheService(t *testing.T) {
 	if status != http.StatusAccepted || cmd.Status != "succeeded" {
 		t.Fatalf("status %d, %+v", status, cmd)
 	}
-	q, _ := url.ParseQuery(h.ari.lastQuery("PUT /endpoints/sendMessage"))
-	if q.Get("to") != "pjsip:201" || q.Get("from") != "4000" || q.Get("body") != "The lamp is on." {
+	q, _ := url.ParseQuery(h.ari.lastQuery("PUT /endpoints/PJSIP/201/sendMessage"))
+	if q.Get("to") != "" || q.Get("from") != "pjsip:4000" || q.Get("body") != "The lamp is on." {
 		t.Fatalf("sent %v", q)
 	}
 	if got, err := h.host.GetCommand(cmd.ID); err != nil || got.Status != "succeeded" {
@@ -158,14 +158,14 @@ func TestText_SendingIsRestricted(t *testing.T) {
 			t.Errorf("%s -> %s: status %d, want %d", c.service, c.req.To, status, c.want)
 		}
 	}
-	if n := len(h.ari.find("PUT /endpoints/sendMessage")); n != 0 {
+	if n := len(h.ari.find("PUT /endpoints/PJSIP/201/sendMessage")); n != 0 {
 		t.Fatalf("%d messages reached Asterisk", n)
 	}
 }
 
 func TestText_FailedSendIsReported(t *testing.T) {
 	h := start(t, withTextLine)
-	h.ari.fail("PUT /endpoints/sendMessage")
+	h.ari.fail("PUT /endpoints/PJSIP/201/sendMessage")
 	status, cmd := h.postMessage("4000", MessageRequest{To: "201", Text: "hi"})
 	if status != http.StatusAccepted || cmd.Status != "failed" || cmd.Error == "" {
 		t.Fatalf("status %d, %+v", status, cmd)

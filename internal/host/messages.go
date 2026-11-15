@@ -104,7 +104,7 @@ func (h *Host) SendMessage(service string, req MessageRequest) (Command, error) 
 	ctx, cancel := ariContext()
 	defer cancel()
 	cmd := Command{ID: randomID(), Status: "succeeded", Action: "message"}
-	if err := h.ari.SendMessage(ctx, "pjsip:"+to.ID, service, text); err != nil {
+	if err := h.ari.SendMessageToEndpoint(ctx, to.ID, "pjsip:"+service, text); err != nil {
 		cmd.Status = "failed"
 		cmd.Error = err.Error()
 		log.Printf("asterisk-host: text from %s to %s: %v", service, to.ID, err)

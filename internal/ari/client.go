@@ -291,6 +291,14 @@ func (c *Client) SendMessage(ctx context.Context, to, from, body string) error {
 	return c.do(ctx, http.MethodPut, "/endpoints/sendMessage", url.Values{"to": {to}, "from": {from}, "body": {body}}, nil)
 }
 
+// SendMessageToEndpoint sends through a known PJSIP endpoint. Using the
+// endpoint-specific ARI operation lets Asterisk resolve the endpoint's current
+// contact instead of treating a bare extension as a SIP To URI.
+func (c *Client) SendMessageToEndpoint(ctx context.Context, endpoint, from, body string) error {
+	path := "/endpoints/PJSIP/" + url.PathEscape(endpoint) + "/sendMessage"
+	return c.do(ctx, http.MethodPut, path, url.Values{"from": {from}, "body": {body}}, nil)
+}
+
 // ReloadModule reloads one Asterisk module.
 func (c *Client) ReloadModule(ctx context.Context, module string) error {
 	return c.do(ctx, http.MethodPut, "/asterisk/modules/"+url.PathEscape(module), nil, nil)
