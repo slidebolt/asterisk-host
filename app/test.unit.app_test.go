@@ -2,11 +2,28 @@ package app
 
 import (
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/slidebolt/asterisk-host/internal/host"
 	messenger "github.com/slidebolt/sb-messenger-sdk"
+	runtime "github.com/slidebolt/sb-runtime"
 )
+
+type resourceEvent struct {
+	id    string
+	state string
+}
+
+type resourceRecorder struct{ events []resourceEvent }
+
+func (r *resourceRecorder) Ready(id string) { r.events = append(r.events, resourceEvent{id, "ready"}) }
+func (r *resourceRecorder) Degraded(id, _, _ string, _ bool) {
+	r.events = append(r.events, resourceEvent{id, "degraded"})
+}
+
+var _ runtime.ResourceReporter = (*resourceRecorder)(nil)
 
 func TestHello(t *testing.T) {
 	h := New().Hello()
@@ -16,8 +33,51 @@ func TestHello(t *testing.T) {
 	if h.Setup == nil || h.Setup.Mode != "dependency" {
 		t.Fatalf("setup = %+v", h.Setup)
 	}
+	if len(h.Setup.Resources) != 1 || h.Setup.Resources[0].ID != asteriskResource {
+		t.Fatalf("resources = %+v", h.Setup.Resources)
+	}
 	if err := h.Validate(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestConfiguredARIReportsHealth(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/ari/asterisk/info" {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write([]byte(`{"system":{"version":"test"}}`))
+	}))
+	t.Setenv("ASTERISK_HOST_BIND", "127.0.0.1:0")
+	t.Setenv("ASTERISK_HOST_TOKEN", "test-token")
+	t.Setenv("ASTERISK_ARI_URL", server.URL)
+	t.Setenv("ASTERISK_ARI_USER", "test-user")
+	t.Setenv("ASTERISK_ARI_PASS", "test-password")
+	msg, payload, err := messenger.MockWithPayload()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer msg.Close()
+	recorder := &resourceRecorder{}
+	a := New()
+	a.SetResourceReporter(recorder)
+	if _, err := a.OnStart(map[string]json.RawMessage{"messenger": payload}); err != nil {
+		t.Fatal(err)
+	}
+	server.Close()
+	cfg, err := host.LoadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := checkARI(cfg); err == nil {
+		t.Fatal("closed ARI unexpectedly healthy")
+	} else {
+		a.resourceDegraded("ari_unavailable", err, true)
+	}
+	_ = a.OnShutdown()
+	if len(recorder.events) != 2 || recorder.events[0] != (resourceEvent{asteriskResource, "ready"}) || recorder.events[1] != (resourceEvent{asteriskResource, "degraded"}) {
+		t.Fatalf("events = %+v", recorder.events)
 	}
 }
 

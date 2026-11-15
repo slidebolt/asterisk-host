@@ -9,24 +9,33 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
+	"github.com/slidebolt/asterisk-host/internal/ari"
 	"github.com/slidebolt/asterisk-host/internal/host"
 	contract "github.com/slidebolt/sb-contract"
 	media "github.com/slidebolt/sb-media-sdk"
 	messenger "github.com/slidebolt/sb-messenger-sdk"
+	runtime "github.com/slidebolt/sb-runtime"
 	speech "github.com/slidebolt/sb-speech-sdk"
 )
 
 // ServiceID is the identifier other binaries use in DependsOn.
 const ServiceID = "asterisk-host"
 
+const asteriskResource = "asterisk-ari"
+
+var ariHealthInterval = 15 * time.Second
+
 // App is the asterisk-host service.
 type App struct {
-	msg  messenger.Messenger
-	host *host.Host
-	srv  *http.Server
-	subs []messenger.Subscription
+	msg         messenger.Messenger
+	host        *host.Host
+	srv         *http.Server
+	subs        []messenger.Subscription
+	reporter    runtime.ResourceReporter
+	monitorStop context.CancelFunc
 }
 
 func New() *App {
@@ -34,20 +43,27 @@ func New() *App {
 }
 
 func (a *App) Hello() contract.HelloResponse {
+	setup := contract.DependencySetup("Voice",
+		contract.SetupField{Key: "bind", Environment: "ASTERISK_HOST_BIND", Name: "Host bind address", Control: contract.SetupText, Default: json.RawMessage(`"127.0.0.1:47832"`), Advanced: true},
+		contract.SetupField{Key: "token", Environment: "ASTERISK_HOST_TOKEN", Name: "Host token", Control: contract.SetupSecret, Sensitive: true, Required: true, Generate: "secret", Advanced: true},
+		contract.SetupField{Key: "ariURL", Environment: "ASTERISK_ARI_URL", Name: "Asterisk ARI URL", Control: contract.SetupText, Format: "url", Advanced: true},
+		contract.SetupField{Key: "ariUser", Environment: "ASTERISK_ARI_USER", Name: "Asterisk ARI user", Control: contract.SetupText, Advanced: true},
+		contract.SetupField{Key: "ariPassword", Environment: "ASTERISK_ARI_PASS", Name: "Asterisk ARI password", Control: contract.SetupSecret, Sensitive: true, Advanced: true},
+	)
+	setup.Resources = []contract.ExternalResourceDefinition{{
+		ID: asteriskResource, Kind: contract.ExternalResourceService, Name: "Asterisk ARI", Description: "Controls calls and receives telephony events from Asterisk.",
+		Fields: []string{"ariURL", "ariUser", "ariPassword"}, Activation: contract.ResourceActivation{Mode: contract.ResourceActivationConfigured, Fields: []string{"ariURL"}},
+	}}
 	return contract.HelloResponse{
 		ID:              ServiceID,
 		Kind:            contract.KindService,
 		ContractVersion: contract.ContractVersion,
 		DependsOn:       []string{"messenger", "media", "speech"},
-		Setup: contract.DependencySetup("Voice",
-			contract.SetupField{Key: "bind", Environment: "ASTERISK_HOST_BIND", Name: "Host bind address", Control: contract.SetupText, Default: json.RawMessage(`"127.0.0.1:47832"`), Advanced: true},
-			contract.SetupField{Key: "token", Environment: "ASTERISK_HOST_TOKEN", Name: "Host token", Control: contract.SetupSecret, Sensitive: true, Required: true, Generate: "secret", Advanced: true},
-			contract.SetupField{Key: "ariURL", Environment: "ASTERISK_ARI_URL", Name: "Asterisk ARI URL", Control: contract.SetupText, Format: "url", Advanced: true},
-			contract.SetupField{Key: "ariUser", Environment: "ASTERISK_ARI_USER", Name: "Asterisk ARI user", Control: contract.SetupText, Advanced: true},
-			contract.SetupField{Key: "ariPassword", Environment: "ASTERISK_ARI_PASS", Name: "Asterisk ARI password", Control: contract.SetupSecret, Sensitive: true, Advanced: true},
-		),
+		Setup:           setup,
 	}
 }
+
+func (a *App) SetResourceReporter(reporter runtime.ResourceReporter) { a.reporter = reporter }
 
 // OnStart stays up when it cannot serve. A failed start aborts sb-manager's
 // startAll, which would stop every other binary.
@@ -59,8 +75,16 @@ func (a *App) OnStart(deps map[string]json.RawMessage) (json.RawMessage, error) 
 	a.msg = msg
 	cfg, configErr := host.LoadConfig()
 	if configErr != nil {
+		if strings.TrimSpace(cfg.ARIURL) != "" {
+			a.resourceDegraded("configuration_invalid", configErr, false)
+			return nil, configErr
+		}
 		log.Printf("asterisk-host: disabled: %v", configErr)
 	} else if err := a.serve(cfg); err != nil {
+		if strings.TrimSpace(cfg.ARIURL) != "" {
+			a.resourceDegraded("ari_unavailable", err, true)
+			return nil, err
+		}
 		log.Printf("asterisk-host: disabled: %v", err)
 	} else {
 		log.Println("asterisk-host: started")
@@ -76,6 +100,10 @@ func (a *App) serve(cfg host.Config) error {
 	if err := cfg.Enabled(); err != nil {
 		return err
 	}
+	if err := checkARI(cfg); err != nil {
+		return err
+	}
+	a.resourceReady()
 	ln, err := net.Listen("tcp", cfg.Bind)
 	if err != nil {
 		return fmt.Errorf("listen: %w", err)
@@ -102,7 +130,51 @@ func (a *App) serve(cfg host.Config) error {
 		}
 	}()
 	a.host.Run()
+	a.startARIMonitor(cfg)
 	return nil
+}
+
+func checkARI(cfg host.Config) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := ari.New(cfg.ARIURL, cfg.ARIUser, cfg.ARIPass).Info(ctx)
+	if err != nil {
+		return fmt.Errorf("check Asterisk ARI: %w", err)
+	}
+	return nil
+}
+
+func (a *App) startARIMonitor(cfg host.Config) {
+	ctx, cancel := context.WithCancel(context.Background())
+	a.monitorStop = cancel
+	go func() {
+		ticker := time.NewTicker(ariHealthInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if err := checkARI(cfg); err != nil {
+					a.resourceDegraded("ari_unavailable", err, true)
+				} else {
+					a.resourceReady()
+				}
+			}
+		}
+	}()
+}
+
+func (a *App) resourceReady() {
+	if a.reporter != nil {
+		a.reporter.Ready(asteriskResource)
+	}
+}
+
+func (a *App) resourceDegraded(code string, err error, retryable bool) {
+	if a.reporter != nil {
+		a.reporter.Degraded(asteriskResource, code, err.Error(), retryable)
+	}
 }
 
 func dependencyPayload(cfg host.Config) (json.RawMessage, error) {
@@ -121,6 +193,9 @@ func dependencyPayload(cfg host.Config) (json.RawMessage, error) {
 }
 
 func (a *App) OnShutdown() error {
+	if a.monitorStop != nil {
+		a.monitorStop()
+	}
 	for _, sub := range a.subs {
 		sub.Unsubscribe()
 	}
