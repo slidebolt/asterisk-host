@@ -38,10 +38,10 @@ func (a *App) Hello() contract.HelloResponse {
 		ID:              ServiceID,
 		Kind:            contract.KindService,
 		ContractVersion: contract.ContractVersion,
-		DependsOn:       []string{"messenger", "media"},
-		Setup: contract.RequiredSetup("Voice",
-			contract.SetupField{Key: "bind", Environment: "ASTERISK_HOST_BIND", Name: "Host bind address", Control: contract.SetupText, Advanced: true},
-			contract.SetupField{Key: "token", Environment: "ASTERISK_HOST_TOKEN", Name: "Host token", Control: contract.SetupSecret, Sensitive: true, Advanced: true},
+		DependsOn:       []string{"messenger", "media", "speech"},
+		Setup: contract.DependencySetup("Voice",
+			contract.SetupField{Key: "bind", Environment: "ASTERISK_HOST_BIND", Name: "Host bind address", Control: contract.SetupText, Default: json.RawMessage(`"127.0.0.1:47832"`), Advanced: true},
+			contract.SetupField{Key: "token", Environment: "ASTERISK_HOST_TOKEN", Name: "Host token", Control: contract.SetupSecret, Sensitive: true, Required: true, Generate: "secret", Advanced: true},
 			contract.SetupField{Key: "ariURL", Environment: "ASTERISK_ARI_URL", Name: "Asterisk ARI URL", Control: contract.SetupText, Format: "url", Advanced: true},
 			contract.SetupField{Key: "ariUser", Environment: "ASTERISK_ARI_USER", Name: "Asterisk ARI user", Control: contract.SetupText, Advanced: true},
 			contract.SetupField{Key: "ariPassword", Environment: "ASTERISK_ARI_PASS", Name: "Asterisk ARI password", Control: contract.SetupSecret, Sensitive: true, Advanced: true},
@@ -57,19 +57,22 @@ func (a *App) OnStart(deps map[string]json.RawMessage) (json.RawMessage, error) 
 		return nil, fmt.Errorf("asterisk-host: connect messenger: %w", err)
 	}
 	a.msg = msg
-	if err := a.serve(); err != nil {
+	cfg, configErr := host.LoadConfig()
+	if configErr != nil {
+		log.Printf("asterisk-host: disabled: %v", configErr)
+	} else if err := a.serve(cfg); err != nil {
 		log.Printf("asterisk-host: disabled: %v", err)
-		return nil, nil
+	} else {
+		log.Println("asterisk-host: started")
 	}
-	log.Println("asterisk-host: started")
-	return nil, nil
+	payload, err := dependencyPayload(cfg)
+	if err != nil {
+		return nil, err
+	}
+	return payload, nil
 }
 
-func (a *App) serve() error {
-	cfg, err := host.LoadConfig()
-	if err != nil {
-		return err
-	}
+func (a *App) serve(cfg host.Config) error {
 	if err := cfg.Enabled(); err != nil {
 		return err
 	}
@@ -100,6 +103,21 @@ func (a *App) serve() error {
 	}()
 	a.host.Run()
 	return nil
+}
+
+func dependencyPayload(cfg host.Config) (json.RawMessage, error) {
+	hostName, port, err := net.SplitHostPort(cfg.Bind)
+	if err != nil {
+		return nil, fmt.Errorf("asterisk host bind: %w", err)
+	}
+	if hostName == "" || hostName == "0.0.0.0" || hostName == "::" {
+		hostName = "127.0.0.1"
+	}
+	payload, err := json.Marshal(map[string]string{
+		"url":   "http://" + net.JoinHostPort(hostName, port),
+		"token": cfg.Token,
+	})
+	return payload, err
 }
 
 func (a *App) OnShutdown() error {

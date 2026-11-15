@@ -4,8 +4,8 @@ go 1.26.1
 
 require (
 	github.com/gorilla/websocket v1.5.3
-	github.com/slidebolt/sb-contract v1.0.9
-	github.com/slidebolt/sb-media-sdk v1.0.4
+	github.com/slidebolt/sb-contract v1.0.11
+	github.com/slidebolt/sb-media-sdk v1.0.5
 	github.com/slidebolt/sb-messenger-sdk v1.0.9
 	github.com/slidebolt/sb-runtime v1.0.7
 	github.com/slidebolt/sb-speech-sdk v1.0.3

@@ -4,16 +4,34 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/slidebolt/asterisk-host/internal/host"
 	messenger "github.com/slidebolt/sb-messenger-sdk"
 )
 
 func TestHello(t *testing.T) {
 	h := New().Hello()
-	if h.ID != ServiceID || len(h.DependsOn) != 2 {
+	if h.ID != ServiceID || len(h.DependsOn) != 3 || h.DependsOn[2] != "speech" {
 		t.Fatalf("hello = %+v", h)
+	}
+	if h.Setup == nil || h.Setup.Mode != "dependency" {
+		t.Fatalf("setup = %+v", h.Setup)
 	}
 	if err := h.Validate(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestDependencyPayloadUsesLoopbackForWildcardBind(t *testing.T) {
+	payload, err := dependencyPayload(host.Config{Bind: "0.0.0.0:47832", Token: "secret"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got map[string]string
+	if err := json.Unmarshal(payload, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got["url"] != "http://127.0.0.1:47832" || got["token"] != "secret" {
+		t.Fatalf("payload = %v", got)
 	}
 }
 
