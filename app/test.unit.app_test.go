@@ -81,6 +81,36 @@ func TestConfiguredARIReportsHealth(t *testing.T) {
 	}
 }
 
+func TestConfiguredUnavailableARIStartsDegraded(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, `{"message":"Asterisk not booted"}`, http.StatusServiceUnavailable)
+	}))
+	defer server.Close()
+	t.Setenv("ASTERISK_HOST_BIND", "127.0.0.1:0")
+	t.Setenv("ASTERISK_HOST_TOKEN", "test-token")
+	t.Setenv("ASTERISK_ARI_URL", server.URL)
+	t.Setenv("ASTERISK_ARI_USER", "test-user")
+	t.Setenv("ASTERISK_ARI_PASS", "test-password")
+	msg, payload, err := messenger.MockWithPayload()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer msg.Close()
+	recorder := &resourceRecorder{}
+	a := New()
+	a.SetResourceReporter(recorder)
+	if _, err := a.OnStart(map[string]json.RawMessage{"messenger": payload}); err != nil {
+		t.Fatalf("temporary ARI outage must not block startup: %v", err)
+	}
+	defer a.OnShutdown()
+	if a.host == nil || a.srv == nil {
+		t.Fatal("host API did not start while ARI was unavailable")
+	}
+	if len(recorder.events) != 1 || recorder.events[0] != (resourceEvent{asteriskResource, "degraded"}) {
+		t.Fatalf("events = %+v", recorder.events)
+	}
+}
+
 func TestDependencyPayloadUsesLoopbackForWildcardBind(t *testing.T) {
 	payload, err := dependencyPayload(host.Config{Bind: "0.0.0.0:47832", Token: "secret"})
 	if err != nil {

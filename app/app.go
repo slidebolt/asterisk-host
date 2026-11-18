@@ -100,10 +100,15 @@ func (a *App) serve(cfg host.Config) error {
 	if err := cfg.Enabled(); err != nil {
 		return err
 	}
+	// ARI is an external resource and may still be booting (or may become
+	// unavailable later). The host API must remain available in that state so
+	// dependants can start and report disconnected entities while RunEvents
+	// reconnects in the background.
 	if err := checkARI(cfg); err != nil {
-		return err
+		a.resourceDegraded("ari_unavailable", err, true)
+	} else {
+		a.resourceReady()
 	}
-	a.resourceReady()
 	ln, err := net.Listen("tcp", cfg.Bind)
 	if err != nil {
 		return fmt.Errorf("listen: %w", err)
